@@ -1,0 +1,11 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+function fixture(){
+ const rows=[Array(16).fill('')];rows[0][15]='Fingerprint';let emails=0,failMail=false;
+ const sheet={getLastRow:()=>rows.length,appendRow:r=>rows.push(r),getRange(r,c,n=1,w=1){return {getValue:()=>rows[r-1][c-1],getValues:()=>rows.slice(r-1,r-1+n).map(v=>v.slice(c-1,c-1+w)),setValue:v=>rows[r-1][c-1]=v,createTextFinder(value){return {matchEntireCell(){return this},findNext(){const i=rows.findIndex((row,j)=>j>=r-1&&row[c-1]===value);return i<0?null:{getRow:()=>i+1}}}}}}};
+ const ctx={console:{error(){}},SpreadsheetApp:{openById:()=>({getSheetByName:()=>sheet}),flush(){}},PropertiesService:{getScriptProperties:()=>({getProperty:()=> 'secret'})},ContentService:{MimeType:{JSON:'json'},createTextOutput:t=>({setMimeType:()=>JSON.parse(t)})},LockService:{getScriptLock:()=>({waitLock(){},tryLock:()=>true,hasLock:()=>true,releaseLock(){}})},MailApp:{sendEmail(){if(failMail)throw Error('quota');emails++}}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync('google-apps-script/Code.gs','utf8'),ctx);
+ const data={secret:'secret',submissionId:'12345678-1234-1234-1234-123456789abc',fingerprint:'a'.repeat(64),answers:{product:'Candles',comments:'=HYPERLINK("bad")'}};
+ return {ctx,rows,post:(changes={})=>ctx.doPost({postData:{contents:JSON.stringify({...data,...changes})}}),emails:()=>emails,fail:()=>failMail=true,recover:()=>failMail=false};
+}
+test('Save once, escape formulas, notify once, reject changed retry',()=>{const f=fixture();assert.equal(f.post().ok,true);assert.equal(f.rows.length,2);assert.equal(f.rows[1][13][0],"'");assert.equal(f.emails(),1);assert.equal(f.post().ok,true);assert.equal(f.rows.length,2);assert.equal(f.emails(),1);assert.equal(f.post({fingerprint:'b'.repeat(64)}).ok,false);assert.equal(f.post({secret:'bad'}).ok,false)});
+test('Email failure does not discard saved response; scheduled retry sends it',()=>{const f=fixture();f.fail();assert.equal(f.post().ok,true);assert.equal(f.rows[1][14],'Pending');f.recover();f.ctx.retryPendingEmails();assert.equal(f.rows[1][14],'Sent');assert.equal(f.emails(),1);f.ctx.retryPendingEmails();assert.equal(f.emails(),1)});
