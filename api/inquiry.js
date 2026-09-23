@@ -1,6 +1,6 @@
 const { createHash } = require('node:crypto');
 const PRODUCTS=['Reed Diffusers','Candles','Room Sprays','Liquid Soap'];
-const COMMON=['product','packaging','packaging_colors','logo','logo_color','logo_background','background_color','comments'];
+const COMMON=['company','respondent','product','packaging','packaging_colors','logo','logo_color','logo_background','background_color','comments'];
 const FIELDS={ 'Reed Diffusers':['diffuser_size','diffuser_container','diffuser_shape'],Candles:['candle_size','candle_container','candle_shape'],'Room Sprays':['spray_size','spray_container'],'Liquid Soap':['soap_quantity','soap_other'] };
 function cleanAnswers(input){
  if(!input||typeof input!=='object'||Array.isArray(input)||!PRODUCTS.includes(input.product))throw Error('Choose a product.');
@@ -10,6 +10,7 @@ function cleanAnswers(input){
   if(typeof value!=='string'||value.length>(key==='comments'?3000:300))throw Error('Invalid answer.');
   out[key]=value.trim();
  }
+ if(!out.company||!out.respondent)throw Error('Enter your company name and your name.');
  for(const key of ['packaging','logo','logo_background'])if(!['','Yes','No','Not sure yet'].includes(out[key]))throw Error('Invalid choice.');
  if(out.packaging!=='Yes')delete out.packaging_colors;
  if(out.logo!=='Yes'){delete out.logo_color;delete out.logo_background;delete out.background_color;}

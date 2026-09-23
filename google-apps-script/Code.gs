@@ -1,6 +1,6 @@
 const SPREADSHEET_ID='1Rd-bbKTOLCommqZSFdJ2GxaEo1xXeWjwxZmL_7hnF-M';
 const NOTIFICATION_EMAIL='b.alves@scentcompanyusa.com';
-const HEADERS=['Received at','Submission ID','Product','Size','Container','Shape','Soap quantity','Custom packaging','Packaging colors','Custom logo','Logo color','Logo background','Background color','Comments','Email status','Fingerprint'];
+const HEADERS=['Received at','Submission ID','Product','Size','Container','Shape','Soap quantity','Custom packaging','Packaging colors','Custom logo','Logo color','Logo background','Background color','Comments','Email status','Fingerprint','Company name','Respondent name'];
 
 // Run once in the editor, then deploy as a web app (execute as you, access Anyone).
 function setup(){
@@ -30,12 +30,13 @@ function doPost(e){
   lock=LockService.getScriptLock();lock.waitLock(15000);
   const sheet=SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Responses');
   if(!sheet||sheet.getRange(1,16).getValue()!=='Fingerprint')throw Error('Run setup first.');
+  if(sheet.getRange(1,17).getValue()!=='Company name')sheet.getRange(1,17,1,2).setValues([HEADERS.slice(16)]).setFontWeight('bold').setBackground('#eeeeee').setWrap(true);
   const last=sheet.getLastRow();
   const found=last>1?sheet.getRange(2,2,last-1,1).createTextFinder(data.submissionId).matchEntireCell(true).findNext():null;
   let row;
   if(found){row=found.getRow();if(sheet.getRange(row,16).getValue()!==data.fingerprint)return json_({ok:false});}
   else{
-   const values=[new Date(),data.submissionId,a.product,a.diffuser_size||a.candle_size||a.spray_size,a.diffuser_container||a.candle_container||a.spray_container,a.diffuser_shape||a.candle_shape,a.soap_quantity==='Other'?a.soap_other:a.soap_quantity,a.packaging,a.packaging_colors,a.logo,a.logo_color,a.logo_background,a.background_color,a.comments,'Pending',data.fingerprint];
+   const values=[new Date(),data.submissionId,a.product,a.diffuser_size||a.candle_size||a.spray_size,a.diffuser_container||a.candle_container||a.spray_container,a.diffuser_shape||a.candle_shape,a.soap_quantity==='Other'?a.soap_other:a.soap_quantity,a.packaging,a.packaging_colors,a.logo,a.logo_color,a.logo_background,a.background_color,a.comments,'Pending',data.fingerprint,a.company,a.respondent];
    sheet.appendRow(values.map((v,i)=>i===0?v:safe_(v)));row=sheet.getLastRow();SpreadsheetApp.flush();
   }
   notify_(sheet,row);
@@ -47,7 +48,7 @@ function notify_(sheet,row){
  const values=sheet.getRange(row,1,1,HEADERS.length).getValues()[0];
  if(values[14]==='Sent')return;
  try{
-  const lines=HEADERS.slice(0,14).map((label,i)=>label+': '+(values[i]||'Not specified'));
+  const lines=[16,17,...Array.from({length:14},(_,i)=>i)].map(i=>HEADERS[i]+': '+(values[i]||'Not specified'));
   MailApp.sendEmail({to:NOTIFICATION_EMAIL,subject:'New product inquiry — '+values[2],body:lines.join('\n')+'\n\nView responses: https://docs.google.com/spreadsheets/d/'+SPREADSHEET_ID+'/edit',name:'Scent Company'});
   sheet.getRange(row,15).setValue('Sent');
  }catch(err){sheet.getRange(row,15).setValue('Pending');console.error('Notification pending: '+err.message);}
